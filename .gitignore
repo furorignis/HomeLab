@@ -1,0 +1,51 @@
+# ============================================
+# Secrets - never commit these
+# ============================================
+# Private keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ecdsa*
+id_ed25519*
+
+# Environment files (only examples are allowed)
+.env
+.env.*
+!.env.example
+
+# Generic secrets folder
+secrets/
+
+# WireGuard configs contain private keys
+wg*.conf
+
+# OPNsense full config (password hashes, keys)
+config.xml
+config-*.xml
+
+# ============================================
+# Backups, images and large files
+# ============================================
+*.vma
+*.vma.*
+*.tar.zst
+*.iso
+*.qcow2
+*.img
+
+# ============================================
+# Private planning notes (kept outside the repo anyway)
+# ============================================
+homelab-guida-e-roadmap.md
+homelab-hardware-e-rete.md
+
+# ============================================
+# Editor / OS clutter
+# ============================================
+*.swp
+*~
+.vscode/
+.idea/
+.DS_Store
