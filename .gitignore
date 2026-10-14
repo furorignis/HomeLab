@@ -49,3 +49,7 @@ homelab-hardware-e-rete.md
 .vscode/
 .idea/
 .DS_Store
+
+# Service env files (e.g. vaultwarden.env) and local-only files
+*.env
+private/

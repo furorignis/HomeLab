@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Pre-commit hook: block commits containing secrets or personal data.
+# Fail-closed: if a check cannot run, the commit is blocked.
+set -u
+
+fail() { echo "COMMIT BLOCKED: $1" >&2; exit 1; }
+
+# 1. gitleaks: known secret formats (keys, tokens, passwords)
+command -v gitleaks >/dev/null 2>&1 || fail "gitleaks is not installed."
+gitleaks git --pre-commit --staged --redact --no-banner -v \
+  || fail "gitleaks found possible secrets (see above)."
+
+# 2. Personal denylist: values that must never be published
+DENYLIST="${HOMELAB_DENYLIST:-$HOME/.config/homelab/denylist.txt}"
+[[ -f "$DENYLIST" ]] || fail "denylist not found: $DENYLIST (create it, even empty)."
+
+PATTERNS="$(mktemp)"
+trap 'rm -f "$PATTERNS"' EXIT
+grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$DENYLIST" > "$PATTERNS"
+[[ -s "$PATTERNS" ]] || exit 0
+
+found=0
+while IFS= read -r -d '' file; do
+  if git show ":$file" 2>/dev/null | grep -i -F -f "$PATTERNS" >/dev/null; then
+    echo "  - $file" >&2
+    found=1
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+(( found == 0 )) || fail "the files above contain values from your denylist."
+exit 0
