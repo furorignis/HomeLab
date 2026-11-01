@@ -53,11 +53,21 @@ for dev in devs:
         lim = TEMP_MAX['nvme'] if j.get('device', {}).get('type') == 'nvme' else TEMP_MAX['default']
         check(f'temp-{tag}', f'{dev} a {temp} °C (limite {lim})' if temp >= lim else None)
 
+# systemd units in error (e.g. opnsense-check crashing). A crash of homelab-check
+# itself cannot be reported from here: it shows up in the weekly summary.
+r = run(['systemctl', 'list-units', '--failed', '--plain', '--no-legend', '--no-pager'])
+units_ok = r.returncode == 0
+if units_ok:
+    for u in {l.split()[0] for l in r.stdout.splitlines() if l.strip()}:
+        check(f'unit-{u}', f'servizio {u} in errore')
+
 def notify(msg):
     return subprocess.run(['/usr/local/bin/tg-notify', msg]).returncode == 0
 
 os.makedirs(STATE, exist_ok=True)
 existing = set(os.listdir(STATE))
+if units_ok:  # a unit that recovered is no longer listed at all
+    ok |= {k for k in existing if k.startswith('unit-') and k not in problems}
 for k, msg in problems.items():
     print('PROBLEMA', k, '-', msg)
     if k not in existing and notify('⚠️ ' + msg):

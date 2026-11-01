@@ -13,6 +13,7 @@ TEMPS=$(for d in $(smartctl --scan | awk '{print $1}'); do
   if [[ $t =~ ^[0-9]+$ ]]; then t="$t °C"; else t="in standby"; fi
   echo "  $d: $t, SMART $s"
 done)
+FAILED=$(systemctl list-units --failed --plain --no-legend --no-pager | awk '{print "  " $1}')
 MSG="📊 riepilogo settimanale
 uptime: $UP
 kernel: $KERN
@@ -21,5 +22,7 @@ storage:
 $STO
 $POOL
 dischi:
-$TEMPS"
+$TEMPS
+servizi in errore:
+${FAILED:-  nessuno}"
 /usr/local/bin/tg-notify "$MSG"
