@@ -18,10 +18,14 @@ def notify(msg):
     return run(['/usr/local/bin/tg-notify', msg]).returncode == 0
 
 def cred():
+    # KEY=value, KEY='value' or KEY="value": the same forms bash accepts in tg-notify
     d = {}
     for line in open(ENV):
-        k, _, v = line.strip().partition('=')
-        d[k] = v.strip("'")
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        k, _, v = line.partition('=')
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"): v = v[1:-1]
+        d[k.strip()] = v
     return d
 
 def api(path, c):
