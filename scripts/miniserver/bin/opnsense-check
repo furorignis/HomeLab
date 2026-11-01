@@ -4,12 +4,16 @@
 #   saved even if the alert cannot be sent, and the recovery message reports the duration;
 # - PPPoE reconnection: public IP changed (only its SHA-256 hash is stored on disk);
 # - gateway degraded according to dpinger: alert only on state changes.
+# Telegram messages are in Italian on purpose; everything else is in English.
+# Tests: OPNSENSE_CHECK_STATE and OPNSENSE_CHECK_VMID override the state directory and
+# the VM ID (a VM that does not exist simulates an outage without touching the router).
 import hashlib, json, os, subprocess, time
 
-STATE = '/var/lib/opnsense-check'
+STATE = os.environ.get('OPNSENSE_CHECK_STATE', '/var/lib/opnsense-check')
+VMID = os.environ.get('OPNSENSE_CHECK_VMID', '100')
 ENV = '/etc/homelab/opnsense.env'
 API = 'https://10.99.0.1/api'   # MGMT network (isolated vmbr1 bridge), self-signed certificate: curl -k
-VMID, GW, WAN = '100', 'WAN_PPPOE', 'wan'
+GW, WAN = 'WAN_PPPOE', 'wan'
 
 def run(cmd, inp=None):
     return subprocess.run(cmd, input=inp, capture_output=True, text=True, timeout=30)
@@ -38,28 +42,28 @@ def api(path, c):
 def rows(d):
     return d if isinstance(d, list) else (d.get('items') or d.get('rows') or [])
 
-def load(n):
+def load(name):
     try:
-        with open(f'{STATE}/{n}') as f: return json.load(f)
+        with open(f'{STATE}/{name}') as f: return json.load(f)
     except (OSError, ValueError): return None
 
-def save(n, v):
-    with open(f'{STATE}/{n}.tmp', 'w') as f: json.dump(v, f)
-    os.replace(f'{STATE}/{n}.tmp', f'{STATE}/{n}')
+def save(name, value):
+    with open(f'{STATE}/{name}.tmp', 'w') as f: json.dump(value, f)
+    os.replace(f'{STATE}/{name}.tmp', f'{STATE}/{name}')
 
-def drop(n):
-    try: os.remove(f'{STATE}/{n}')
+def drop(name):
+    try: os.remove(f'{STATE}/{name}')
     except FileNotFoundError: pass
 
-def ora(t): return time.strftime('%H:%M del %d/%m', time.localtime(t))
+def fmt_time(t): return time.strftime('%H:%M del %d/%m', time.localtime(t))
 
-def periodo(a, b):
+def fmt_period(a, b):
     # Telegram text (Italian): same day "dalle 01:15 alle 01:18 del 25/10", otherwise full dates
     if time.strftime('%d/%m', time.localtime(a)) == time.strftime('%d/%m', time.localtime(b)):
-        return f"dalle {time.strftime('%H:%M', time.localtime(a))} alle {ora(b)}"
-    return f'dalle {ora(a)} alle {ora(b)}'
+        return f"dalle {time.strftime('%H:%M', time.localtime(a))} alle {fmt_time(b)}"
+    return f'dalle {fmt_time(a)} alle {fmt_time(b)}'
 
-def durata(s):
+def fmt_duration(s):
     s = int(s); h, r = divmod(s, 3600); m, s = divmod(r, 60)
     return f'{h} h {m} min' if h else (f'{m} min {s} s' if m else f'{s} s')
 
@@ -82,33 +86,33 @@ else:
         elif gw.get('status') in ('down', 'force_down'):
             cause = f"gateway WAN giù ({gw.get('status_translated')})"
 
-out = load('interruzione')
+outage = load('outage')
 if cause:
-    if out is None:
-        out = {'inizio': now, 'causa': cause, 'avvisato': False}
-        save('interruzione', out)
-    if not out['avvisato'] and notify(f"⚠️ {out['causa']} (dalle {ora(out['inizio'])})"):
-        out['avvisato'] = True
-        save('interruzione', out)
-    print('OUTAGE:', out['causa'], 'since', ora(out['inizio']))
+    if outage is None:
+        outage = {'start': now, 'cause': cause, 'notified': False}
+        save('outage', outage)
+    if not outage['notified'] and notify(f"⚠️ {outage['cause']} (dalle {fmt_time(outage['start'])})"):
+        outage['notified'] = True
+        save('outage', outage)
+    print('OUTAGE:', outage['cause'], 'since', fmt_time(outage['start']))
 else:
-    h = hashlib.sha256(wan['addr4'].encode()).hexdigest()
-    old = load('wan-ip')
-    cambiato = old is not None and old != h
-    if out is not None:
-        msg = f"✅ rientrato: {out['causa']}, {periodo(out['inizio'], now)} ({durata(now - out['inizio'])})"
-        if cambiato: msg += '; IP pubblico cambiato'
+    ip_hash = hashlib.sha256(wan['addr4'].encode()).hexdigest()
+    old_hash = load('wan-ip')
+    ip_changed = old_hash is not None and old_hash != ip_hash
+    if outage is not None:
+        msg = f"✅ rientrato: {outage['cause']}, {fmt_period(outage['start'], now)} ({fmt_duration(now - outage['start'])})"
+        if ip_changed: msg += '; IP pubblico cambiato'
         if notify(msg):
-            drop('interruzione'); save('wan-ip', h)
-    elif cambiato:
-        if notify('🔄 riconnessione PPPoE: IP pubblico cambiato'): save('wan-ip', h)
-    elif old is None:
-        save('wan-ip', h)
-    bad = gw.get('status') != 'none'
-    deg = load('degradato')
-    if bad and deg is None:
+            drop('outage'); save('wan-ip', ip_hash)
+    elif ip_changed:
+        if notify('🔄 riconnessione PPPoE: IP pubblico cambiato'): save('wan-ip', ip_hash)
+    elif old_hash is None:
+        save('wan-ip', ip_hash)
+    degraded_now = gw.get('status') != 'none'
+    degraded = load('degraded')
+    if degraded_now and degraded is None:
         txt = f"gateway WAN degradato: {gw.get('status_translated')}, RTT {gw.get('delay')}, perdita {gw.get('loss')}"
-        if notify('⚠️ ' + txt): save('degradato', txt)
-    elif not bad and deg is not None:
-        if notify('✅ rientrato: ' + deg): drop('degradato')
+        if notify('⚠️ ' + txt): save('degraded', txt)
+    elif not degraded_now and degraded is not None:
+        if notify('✅ rientrato: ' + degraded): drop('degraded')
     print(f"ok: gateway {gw.get('status_translated')}, RTT {gw.get('delay')}, loss {gw.get('loss')}, WAN {wan.get('status')}")
