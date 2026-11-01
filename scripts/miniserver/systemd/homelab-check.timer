@@ -1,0 +1,7 @@
+[Unit]
+Description=Esegue homelab-check ogni 5 minuti
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target

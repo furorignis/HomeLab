@@ -1,0 +1,5 @@
+[Unit]
+Description=Riepilogo settimanale del miniserver su Telegram
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/homelab-weekly

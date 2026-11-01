@@ -1,0 +1,9 @@
+[Unit]
+Description=Avviso Telegram all'avvio del miniserver
+Wants=network-online.target
+After=network-online.target pve-cluster.service
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/homelab-boot-notify
+[Install]
+WantedBy=multi-user.target

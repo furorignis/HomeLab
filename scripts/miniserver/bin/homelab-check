@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# Controlli periodici del miniserver: avvisa su Telegram solo ai cambi di stato.
+import json, os, subprocess
+STATE = '/var/lib/homelab-check'
+WARN_PCT = 85
+TEMP_MAX = {'nvme': 70, 'default': 55}
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+
+problems, ok = {}, set()
+def check(key, bad):
+    if bad: problems[key] = bad
+    else: ok.add(key)
+
+# Storage Proxmox
+r = run(['pvesm', 'status'])
+if r.returncode != 0:
+    check('pvesm', 'pvesm status non risponde')
+else:
+    check('pvesm', None)
+    for line in r.stdout.splitlines()[1:]:
+        f = line.split()
+        if len(f) < 7: continue
+        name, status = f[0], f[2]
+        check(f'storage-{name}-stato', None if status == 'active' else f'storage {name} NON attivo (stato: {status})')
+        if status == 'active':
+            pct = float(f[6].rstrip('%'))
+            check(f'storage-{name}-spazio', f'storage {name} pieno al {pct:.0f}%' if pct >= WARN_PCT else None)
+
+# Thin pool dell'NVMe
+r = run(['lvs', '--noheadings', '--separator', ',', '-o', 'lv_name,data_percent,metadata_percent', 'pve'])
+for line in r.stdout.splitlines():
+    f = [x.strip() for x in line.split(',')]
+    if f[0] == 'data' and len(f) == 3:
+        d, m = float(f[1] or 0), float(f[2] or 0)
+        check('thinpool', f'thin pool local-lvm: dati {d:.0f}%, metadati {m:.0f}%' if max(d, m) >= WARN_PCT else None)
+
+# SMART e temperature
+scan = run(['smartctl', '--scan', '-j'])
+try: devs = [d['name'] for d in json.loads(scan.stdout).get('devices', [])]
+except Exception: devs = []
+for dev in devs:
+    tag = dev.replace('/dev/', '').replace('/', '-')
+    r = run(['smartctl', '-j', '-H', '-A', '-n', 'standby', dev])
+    try: j = json.loads(r.stdout)
+    except Exception: continue
+    passed = j.get('smart_status', {}).get('passed')
+    if passed is not None:
+        check(f'smart-{tag}', None if passed else f'SMART di {dev} NON superato')
+    temp = j.get('temperature', {}).get('current')
+    if temp is not None:
+        lim = TEMP_MAX['nvme'] if j.get('device', {}).get('type') == 'nvme' else TEMP_MAX['default']
+        check(f'temp-{tag}', f'{dev} a {temp} °C (limite {lim})' if temp >= lim else None)
+
+def notify(msg):
+    return subprocess.run(['/usr/local/bin/tg-notify', msg]).returncode == 0
+
+existing = set(os.listdir(STATE))
+for k, msg in problems.items():
+    print('PROBLEMA', k, '-', msg)
+    if k not in existing and notify('⚠️ ' + msg):
+        open(f'{STATE}/{k}', 'w').write(msg)
+for k in existing & ok:
+    old = open(f'{STATE}/{k}').read()
+    if notify('✅ rientrato: ' + old):
+        os.remove(f'{STATE}/{k}')
+print(f'controlli ok: {len(ok)}, problemi: {len(problems)}')

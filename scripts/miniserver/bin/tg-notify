@@ -1,0 +1,7 @@
+#!/bin/bash
+# Uso: tg-notify "messaggio"  ->  invia "[hostname] messaggio" su Telegram
+set -u
+. /etc/homelab/telegram.env
+curl -fsS -m 15 -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+  --data-urlencode "chat_id=${TG_CHAT}" \
+  --data-urlencode "text=[$(hostname -s)] $*" >/dev/null

@@ -1,0 +1,5 @@
+#!/bin/bash
+# Chiamato da PAM alla apertura di una sessione SSH
+[ "${PAM_TYPE:-}" = "open_session" ] || exit 0
+( /usr/local/bin/tg-notify "🔑 login SSH: ${PAM_USER} da ${PAM_RHOST}" >/dev/null 2>&1 & ) || true
+exit 0

@@ -1,0 +1,24 @@
+#!/bin/bash
+# Riepilogo settimanale del miniserver su Telegram
+apt-get update -qq >/dev/null 2>&1
+UPD=$(apt-get -s dist-upgrade 2>/dev/null | grep -c '^Inst ')
+KERN=$(uname -r)
+UP=$(uptime -p | sed 's/^up //')
+STO=$(pvesm status 2>/dev/null | awk 'NR>1 {printf "  %s: %s (%s)\n", $1, $3, $7}')
+POOL=$(lvs --noheadings --separator ' ' -o lv_name,data_percent,metadata_percent pve 2>/dev/null | awk '$1=="data" {printf "  thin pool: dati %.0f%%, metadati %.0f%%\n", $2, $3}')
+TEMPS=$(for d in $(smartctl --scan | awk '{print $1}'); do
+  j=$(smartctl -j -H -A -n standby "$d" 2>/dev/null)
+  t=$(echo "$j" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("temperature",{}).get("current","standby"))' 2>/dev/null)
+  s=$(echo "$j" | python3 -c 'import sys,json; d=json.load(sys.stdin); p=d.get("smart_status",{}).get("passed"); print("PASSED" if p else ("FAILED" if p is False else "n/d"))' 2>/dev/null)
+  echo "  $d: $t °C, SMART $s"
+done)
+MSG="📊 riepilogo settimanale
+uptime: $UP
+kernel: $KERN
+aggiornamenti disponibili: $UPD
+storage:
+$STO
+$POOL
+dischi:
+$TEMPS"
+/usr/local/bin/tg-notify "$MSG"

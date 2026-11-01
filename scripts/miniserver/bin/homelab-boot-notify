@@ -1,0 +1,13 @@
+#!/bin/bash
+# Avviso Telegram all'avvio. OPNsense e' una VM su questo server:
+# internet arriva qualche minuto dopo, quindi si riprova ogni 15 s per 15 minuti.
+BOOT=$(date -d "$(uptime -s)" '+%H:%M del %d/%m')
+for i in $(seq 1 60); do
+  ONLINE=$(cut -d. -f1 /proc/uptime)
+  if /usr/local/bin/tg-notify "🔄 avviato alle ${BOOT}, kernel $(uname -r), online dopo ${ONLINE} s"; then
+    exit 0
+  fi
+  sleep 15
+done
+echo "internet non disponibile dopo 15 minuti: avviso non inviato" >&2
+exit 1

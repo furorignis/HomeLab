@@ -1,0 +1,10 @@
+[Unit]
+Description=Controllo di OPNsense (gateway, PPPoE) con avvisi Telegram
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/opnsense-check
+StateDirectory=opnsense-check
+UMask=0077
+StateDirectoryMode=0700
