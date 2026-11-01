@@ -56,6 +56,7 @@ for dev in devs:
 def notify(msg):
     return subprocess.run(['/usr/local/bin/tg-notify', msg]).returncode == 0
 
+os.makedirs(STATE, exist_ok=True)
 existing = set(os.listdir(STATE))
 for k, msg in problems.items():
     print('PROBLEMA', k, '-', msg)

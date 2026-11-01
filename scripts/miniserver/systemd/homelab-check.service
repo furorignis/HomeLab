@@ -3,3 +3,4 @@ Description=Controlli periodici del miniserver con avvisi Telegram
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/homelab-check
+StateDirectory=homelab-check
