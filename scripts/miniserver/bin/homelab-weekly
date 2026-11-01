@@ -10,7 +10,8 @@ TEMPS=$(for d in $(smartctl --scan | awk '{print $1}'); do
   j=$(smartctl -j -H -A -n standby "$d" 2>/dev/null)
   t=$(echo "$j" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("temperature",{}).get("current","standby"))' 2>/dev/null)
   s=$(echo "$j" | python3 -c 'import sys,json; d=json.load(sys.stdin); p=d.get("smart_status",{}).get("passed"); print("PASSED" if p else ("FAILED" if p is False else "n/d"))' 2>/dev/null)
-  echo "  $d: $t °C, SMART $s"
+  if [[ $t =~ ^[0-9]+$ ]]; then t="$t °C"; else t="in standby"; fi
+  echo "  $d: $t, SMART $s"
 done)
 MSG="📊 riepilogo settimanale
 uptime: $UP
