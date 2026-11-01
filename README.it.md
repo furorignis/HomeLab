@@ -90,3 +90,7 @@ incidents/            report di incidenti simulati (in arrivo)
 ```
 
 Dopo il clone, attivare l'hook con `git config core.hooksPath .githooks`. Servono [gitleaks](https://github.com/gitleaks/gitleaks) e un file denylist in `~/.config/homelab/denylist.txt`, anche vuoto: senza, ogni commit viene bloccato, per scelta.
+
+## Licenza
+
+[MIT](LICENSE)
