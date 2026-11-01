@@ -1,5 +1,5 @@
 [Unit]
-Description=Esegue homelab-check ogni 5 minuti
+Description=Run homelab-check every 5 minutes
 [Timer]
 OnBootSec=3min
 OnUnitActiveSec=5min

@@ -1,5 +1,5 @@
 [Unit]
-Description=Controllo di OPNsense (gateway, PPPoE) con avvisi Telegram
+Description=OPNsense check (gateway, PPPoE) with Telegram alerts
 After=network-online.target
 
 [Service]

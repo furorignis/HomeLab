@@ -1,5 +1,5 @@
 [Unit]
-Description=Controllo di OPNsense ogni minuto
+Description=Run opnsense-check every minute
 
 [Timer]
 OnBootSec=5min

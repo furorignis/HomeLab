@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-# Controllo di OPNsense ogni minuto (opnsense-check.timer), avvisi su Telegram con tg-notify:
-# - interruzione (VM ferma, API muta, PPPoE senza IP, gateway giu'): ora d'inizio salvata
-#   anche se l'invio fallisce, riepilogo con la durata al rientro;
-# - riconnessione PPPoE: cambio dell'IP pubblico (su disco solo l'impronta SHA-256);
-# - gateway degradato secondo dpinger: avviso solo ai cambi di stato.
+# OPNsense check, every minute (opnsense-check.timer); Telegram alerts via tg-notify:
+# - outage (VM stopped, API silent, PPPoE without IP, gateway down): the start time is
+#   saved even if the alert cannot be sent, and the recovery message reports the duration;
+# - PPPoE reconnection: public IP changed (only its SHA-256 hash is stored on disk);
+# - gateway degraded according to dpinger: alert only on state changes.
 import hashlib, json, os, subprocess, time
 
 STATE = '/var/lib/opnsense-check'
 ENV = '/etc/homelab/opnsense.env'
-API = 'https://10.99.0.1/api'   # rete MGMT (vmbr1), certificato autofirmato: curl -k
+API = 'https://10.99.0.1/api'   # MGMT network (isolated vmbr1 bridge), self-signed certificate: curl -k
 VMID, GW, WAN = '100', 'WAN_PPPOE', 'wan'
 
 def run(cmd, inp=None):
@@ -29,7 +29,7 @@ def cred():
     return d
 
 def api(path, c):
-    # credenziali passate da stdin (-K -): non compaiono in ps
+    # credentials passed on stdin (-K -): they never appear in ps
     r = run(['curl', '-skf', '-m', '10', '-K', '-', f'{API}/{path}'],
             inp=f'user = "{c["OPN_KEY"]}:{c["OPN_SECRET"]}"\n')
     try: return json.loads(r.stdout) if r.returncode == 0 else None
@@ -54,7 +54,7 @@ def drop(n):
 def ora(t): return time.strftime('%H:%M del %d/%m', time.localtime(t))
 
 def periodo(a, b):
-    # stesso giorno: "dalle 01:15 alle 01:18 del 25/10"; giorni diversi: date complete
+    # Telegram text (Italian): same day "dalle 01:15 alle 01:18 del 25/10", otherwise full dates
     if time.strftime('%d/%m', time.localtime(a)) == time.strftime('%d/%m', time.localtime(b)):
         return f"dalle {time.strftime('%H:%M', time.localtime(a))} alle {ora(b)}"
     return f'dalle {ora(a)} alle {ora(b)}'
@@ -90,7 +90,7 @@ if cause:
     if not out['avvisato'] and notify(f"⚠️ {out['causa']} (dalle {ora(out['inizio'])})"):
         out['avvisato'] = True
         save('interruzione', out)
-    print('INTERRUZIONE:', out['causa'], 'dalle', ora(out['inizio']))
+    print('OUTAGE:', out['causa'], 'since', ora(out['inizio']))
 else:
     h = hashlib.sha256(wan['addr4'].encode()).hexdigest()
     old = load('wan-ip')
@@ -111,4 +111,4 @@ else:
         if notify('⚠️ ' + txt): save('degradato', txt)
     elif not bad and deg is not None:
         if notify('✅ rientrato: ' + deg): drop('degradato')
-    print(f"ok: gateway {gw.get('status_translated')}, RTT {gw.get('delay')}, perdita {gw.get('loss')}, WAN {wan.get('status')}")
+    print(f"ok: gateway {gw.get('status_translated')}, RTT {gw.get('delay')}, loss {gw.get('loss')}, WAN {wan.get('status')}")

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Controlli periodici del miniserver: avvisa su Telegram solo ai cambi di stato.
+# Periodic host health checks. Telegram alerts only on state changes (⚠️ new problem,
+# ✅ recovered); open problems are kept as files in /var/lib/homelab-check.
 import json, os, subprocess
 STATE = '/var/lib/homelab-check'
 WARN_PCT = 85
@@ -13,7 +14,7 @@ def check(key, bad):
     if bad: problems[key] = bad
     else: ok.add(key)
 
-# Storage Proxmox
+# Proxmox storage
 r = run(['pvesm', 'status'])
 if r.returncode != 0:
     check('pvesm', 'pvesm status non risponde')
@@ -28,7 +29,7 @@ else:
             pct = float(f[6].rstrip('%'))
             check(f'storage-{name}-spazio', f'storage {name} pieno al {pct:.0f}%' if pct >= WARN_PCT else None)
 
-# Thin pool dell'NVMe
+# NVMe thin pool
 r = run(['lvs', '--noheadings', '--separator', ',', '-o', 'lv_name,data_percent,metadata_percent', 'pve'])
 for line in r.stdout.splitlines():
     f = [x.strip() for x in line.split(',')]
@@ -36,7 +37,7 @@ for line in r.stdout.splitlines():
         d, m = float(f[1] or 0), float(f[2] or 0)
         check('thinpool', f'thin pool local-lvm: dati {d:.0f}%, metadati {m:.0f}%' if max(d, m) >= WARN_PCT else None)
 
-# SMART e temperature
+# SMART status and temperatures
 scan = run(['smartctl', '--scan', '-j'])
 try: devs = [d['name'] for d in json.loads(scan.stdout).get('devices', [])]
 except Exception: devs = []
@@ -69,11 +70,11 @@ existing = set(os.listdir(STATE))
 if units_ok:  # a unit that recovered is no longer listed at all
     ok |= {k for k in existing if k.startswith('unit-') and k not in problems}
 for k, msg in problems.items():
-    print('PROBLEMA', k, '-', msg)
+    print('PROBLEM', k, '-', msg)
     if k not in existing and notify('⚠️ ' + msg):
         open(f'{STATE}/{k}', 'w').write(msg)
 for k in existing & ok:
     old = open(f'{STATE}/{k}').read()
     if notify('✅ rientrato: ' + old):
         os.remove(f'{STATE}/{k}')
-print(f'controlli ok: {len(ok)}, problemi: {len(problems)}')
+print(f'checks ok: {len(ok)}, problems: {len(problems)}')

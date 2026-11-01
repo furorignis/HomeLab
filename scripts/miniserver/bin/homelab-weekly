@@ -1,5 +1,5 @@
 #!/bin/bash
-# Riepilogo settimanale del miniserver su Telegram
+# Weekly host summary sent to Telegram (homelab-weekly.timer).
 apt-get update -qq >/dev/null 2>&1
 UPD=$(apt-get -s dist-upgrade 2>/dev/null | grep -c '^Inst ')
 KERN=$(uname -r)

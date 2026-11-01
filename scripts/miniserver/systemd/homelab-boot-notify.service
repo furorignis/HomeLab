@@ -1,5 +1,5 @@
 [Unit]
-Description=Avviso Telegram all'avvio del miniserver
+Description=Telegram notice at boot
 Wants=network-online.target
 After=network-online.target pve-cluster.service
 [Service]

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Chiamato da PAM alla apertura di una sessione SSH
+# Called by PAM (pam_exec) when an SSH session opens; the alert runs in the background.
 [ "${PAM_TYPE:-}" = "open_session" ] || exit 0
 ( /usr/local/bin/tg-notify "🔑 login SSH: ${PAM_USER} da ${PAM_RHOST}" >/dev/null 2>&1 & ) || true
 exit 0
