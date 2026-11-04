@@ -7,11 +7,12 @@ A home network rebuilt around a single Proxmox VE host that is also the router: 
 ## At a glance
 
 - **Router and firewall:** OPNsense 26.7 VM, PPPoE over VLAN on a fibre line, Kea DHCP, Unbound DNS, no inbound access from the WAN.
+- **DNS filtering:** ads, trackers and known malicious domains blocked for every device; DNS sent to outside servers is redirected to the filter, DNS over TLS is refused.
 - **Hypervisor:** Proxmox VE 9.2, headless, key-only SSH, a tested emergency runbook.
 - **Resilience:** nightly snapshot backups with retention, restores tested (container and VM), encrypted configuration exports.
 - **Monitoring:** my own alerting in Bash and Python with systemd: storage, SMART, temperatures, failed services, gateway and PPPoE outages with their duration; alerts only on state changes.
 - **Secrets hygiene:** pre-commit hook (gitleaks + personal denylist, fail-closed); credentials never passed as process arguments.
-- **Next:** DNS filtering, WireGuard VPN, Suricata IDS/IPS, Wazuh vs Splunk.
+- **Next:** WireGuard VPN, Suricata IDS/IPS, Wazuh vs Splunk.
 
 ## Network
 
@@ -20,7 +21,7 @@ flowchart LR
   NET(("Internet")) --- ONT["Fibre ONT"]
   ONT -->|"PPPoE · VLAN 835"| OPN
   subgraph host["Proxmox VE host"]
-    OPN["OPNsense VM<br/>firewall · DHCP · DNS"]
+    OPN["OPNsense VM<br/>firewall · DHCP · filtered DNS"]
     SVC["Services<br/>(coming phases)"]
     HM["Host management<br/>separate NIC"]
   end
@@ -43,8 +44,8 @@ Hardware: AMD Ryzen 5 9600X, 32 GB RAM, 256 GB NVMe (system and guests), 1 TB HD
 | 3 | Cut-over: OPNsense becomes the home router | ✅ done | [EN](docs/en/phase-3-cutover.md) · [IT](docs/it/phase-3-cutover.md) |
 | T | Alerting and monitoring | ✅ host and router · 🔜 per service | [scripts](scripts/miniserver/) |
 | U | Storage upgrade, bulk services to a second server | 🟡 prepared | – |
-| 4 | DNS filtering | 🔜 next | – |
-| 5 | WireGuard VPN | ⏳ planned | – |
+| 4 | DNS filtering | ✅ done | [EN](docs/en/phase-4-dns-filter.md) · [IT](docs/it/phase-4-dns-filter.md) |
+| 5 | WireGuard VPN | 🔜 next | – |
 | 6 | Small NAS (Samba) | ⏳ planned | – |
 | 7 | Reverse proxy and certificates | ⏳ planned | – |
 | 8 | Vaultwarden | ⏳ planned | – |
@@ -61,9 +62,10 @@ The order is deliberate: first a host that can be managed and recovered, then th
 |---|---|
 | Linux and SSH hardening | [Phase 0](docs/en/phase-0-headless-proxmox.md) |
 | Backup, restore and recovery testing | [Phase 1](docs/en/phase-1-backups.md), [Phase 2](docs/en/phase-2-opnsense-lab.md) |
-| Firewall and network design: PPPoE, VLAN, DHCP, DNS | [Phase 2](docs/en/phase-2-opnsense-lab.md), [Phase 3](docs/en/phase-3-cutover.md) |
+| Firewall and network design: PPPoE, VLAN, DHCP, DNS | [Phase 2](docs/en/phase-2-opnsense-lab.md), [Phase 3](docs/en/phase-3-cutover.md), [Phase 4](docs/en/phase-4-dns-filter.md) |
 | Virtualization and PCI passthrough | [Phase 2](docs/en/phase-2-opnsense-lab.md) |
 | Network troubleshooting: TTL, ARP, MTU, DHCP | [Phase 3](docs/en/phase-3-cutover.md) |
+| DNS security: filtering, resolver-bypass prevention, log-based diagnosis | [Phase 4](docs/en/phase-4-dns-filter.md) |
 | Change management and rollback planning | [Phase 2](docs/en/phase-2-opnsense-lab.md), [Phase 3](docs/en/phase-3-cutover.md) |
 | Monitoring and alerting: Bash, Python, systemd | [scripts/miniserver](scripts/miniserver/) |
 | Secure scripting: secrets out of argv, least-privilege API access | [scripts/miniserver](scripts/miniserver/) and its commit history |
